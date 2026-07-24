@@ -30,6 +30,7 @@ Use this file to place customization at the correct hook.
 
 ## Common Mistakes
 
+- Relying on `has_object_permission` to secure a list/create view: DRF invokes it only from `get_object()`, which `ListAPIView`/`CreateAPIView`/`ListCreateAPIView` (and non-detail ViewSet actions, `@action(detail=False)`) never call — so the check silently never runs and the view is unprotected at the object level (IDOR). Authorize in `has_permission` and scope in `get_queryset` on those views. Naming tell: a detail-scoped permission class applied to a list/create view is this bug until proven otherwise.
 - Putting filtering/security scoping in `list` instead of `get_queryset`
 - Duplicating validation in view and serializer
 - Bypassing DRF orchestration by reimplementing `create`/`update` unnecessarily

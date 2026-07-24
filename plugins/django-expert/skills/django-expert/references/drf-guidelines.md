@@ -290,6 +290,39 @@ class PostViewSet(viewsets.ModelViewSet):
     ...
 ```
 
+### Object-Level Permissions Don't Run on List/Create
+
+```python
+# ❌ BAD: has_object_permission is a no-op on list/create
+class IsOwner(permissions.BasePermission):
+    def has_object_permission(self, request, view, obj):
+        return obj.owner == request.user
+
+class PostListView(ListAPIView):        # never calls get_object()
+    queryset = Post.objects.all()       # returns every tenant's posts
+    permission_classes = [IsOwner]      # silently does nothing -> IDOR
+
+# ✅ GOOD: request-level check + scoped queryset
+class PostListView(ListAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Post.objects.filter(owner=self.request.user)
+```
+
+DRF invokes `has_object_permission` only from `GenericAPIView.get_object()`.
+`ListAPIView`, `CreateAPIView`, `ListCreateAPIView`, and non-detail ViewSet
+actions (`@action(detail=False)`) never call it, so a permission class that
+overrides *only* `has_object_permission` is a silent no-op on those views — a
+classic IDOR where any authenticated user gets a `200` with another tenant's
+rows and no error is raised.
+
+**Rule**: Object-level permissions run only on views that call `get_object()`
+(detail/retrieve/update/destroy). On list/create views, authorize in
+`has_permission` and scope `get_queryset()` to the caller's tenant. A
+detail-scoped permission class applied to a list/create view is this bug until
+proven otherwise.
+
 ### Per-Action Permissions
 
 ```python

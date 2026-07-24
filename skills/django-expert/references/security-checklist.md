@@ -165,6 +165,7 @@ def delete_post(request, post_id):
 
 # ✅ BETTER: Use permissions
 from rest_framework import permissions
+from rest_framework.generics import RetrieveUpdateDestroyAPIView
 
 class IsOwnerOrReadOnly(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
@@ -172,12 +173,20 @@ class IsOwnerOrReadOnly(permissions.BasePermission):
             return True
         return obj.author == request.user
 
-class PostDetailView(APIView):
+# has_object_permission runs here because this view calls get_object().
+# A bare APIView has no get_object(), so the check would silently never run.
+class PostDetailView(RetrieveUpdateDestroyAPIView):
+    queryset = Post.objects.all()
     permission_classes = [IsOwnerOrReadOnly]
-    ...
 ```
 
 **Rule**: Authentication ≠ Authorization. Always check permissions.
+
+**Note**: `has_object_permission` runs only on views that call `get_object()`
+(the concrete detail generics, or a `GenericAPIView` you call it from). It is a
+silent no-op on list/create views and on bare `APIView`s — there, authorize in
+`has_permission` and scope `get_queryset()`. See `drf-guidelines.md`
+(*Object-Level Permissions Don't Run on List/Create*).
 
 ### 6. Security Misconfiguration
 
